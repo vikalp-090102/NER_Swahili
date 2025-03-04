@@ -1,86 +1,85 @@
-# NER_Swahili
-Named Entity Recognition for Swahili using Inkuba LM Model
+# NLP Project: Swahili Named Entity Recognition using InkubaLM-0.4B
 
+## Project Overview
+This project fine-tunes the **Lelapa/InkubaLM-0.4B** language model for Named Entity Recognition (NER) on the **Swahili News dataset**. The goal is to improve entity recognition capabilities in Swahili by leveraging **transformers** and **Hugging Face's datasets**.
 
-Named Entity Recognition for Swahili using Lelapa Inkuba Language Model
-Project Overview
-This project focuses on Named Entity Recognition (NER) for the Swahili language using the Lelapa Inkuba Language Model (LM). NER is a crucial Natural Language Processing (NLP) task that involves identifying and classifying entities such as names, locations, organizations, and dates within Swahili text.
+## Prerequisites
+Before running the project, ensure you have **Python 3.13.0** installed on your system.
 
-Given the complex morphology of Swahili, this project fine-tunes the Lelapa InkubaLM-0.4B model on the Masakhane NER dataset to improve accuracy. The fine-tuned model significantly enhances entity recognition, making it a valuable tool for Swahili NLP applications.
+### Required Libraries
+Install the necessary dependencies by running:
+```bash
+pip install transformers datasets seqeval torch
+```
 
-Dataset
-The project utilizes the Masakhane NER dataset, specifically the Swahili (swa) subset, sourced from Hugging Face. The dataset is structured into three splits:
-
-Training Set: 2,109 examples
-Validation Set: 300 examples
-Test Set: 604 examples
-Each record consists of:
-
-Tokens: Individual words or subwords
-NER Tags: Entity labels (e.g., PERSON, LOCATION, ORGANIZATION)
-Installation
-To set up the environment, install the required dependencies using:
-
-bash
-Copy
-Edit
-pip install transformers datasets seqeval torch numpy pandas wandb
-Hugging Face Authentication
-To use the Lelapa Inkuba model, you need a Hugging Face access token. Sign up at Hugging Face and generate a token from your settings under Access Tokens. Then, log in using:
-
-bash
-Copy
-Edit
+Additionally, you need to authenticate with **Hugging Face**:
+```bash
 huggingface-cli login
-Or set the token in your script:
+```
 
-python
-Copy
-Edit
-from huggingface_hub import login
-login(token="your_huggingface_access_token")
-Weights & Biases (W&B) Authentication
-The fine-tuning process requires logging into Weights & Biases (W&B) for experiment tracking. Sign up at Weights & Biases and log in using:
+## Dataset
+We use the **MasakhaNER** dataset for Swahili NER, which is loaded via Hugging Face's `datasets` library:
+```python
+from datasets import load_dataset
+dataset = load_dataset("masakhaner", "swa")
+print(dataset)
+```
 
-bash
-Copy
-Edit
-wandb login
-Model Architecture
-The InkubaLM-0.4B model is fine-tuned for token classification with 9 NER categories. The training process includes:
+## Model and Tokenization
+We fine-tune **Lelapa/InkubaLM-0.4B** using the `AutoTokenizer` and `AutoModelForTokenClassification`:
+```python
+from transformers import AutoTokenizer
 
-Tokenizer: Hugging Face AutoTokenizer
-Model: InkubaLM-0.4B pre-trained model
-Training Framework: Hugging Face Trainer API
-Evaluation Metrics: Precision, Recall, F1-score (seqeval)
-Training Configuration
-Key hyperparameters:
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained("lelapa/InkubaLM-0.4B", trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
+```
 
-Learning Rate: 5e-5
-Batch Size: Training (1), Evaluation (2)
-Epochs: 4
-Evaluation Metric: Overall F1-score
-Running the Code
-To fine-tune and evaluate the model, run:
+## Training
+We use Hugging Face's `Trainer` for fine-tuning. The `DataCollatorForTokenClassification` ensures proper token alignment.
+```python
+from transformers import AutoModelForTokenClassification, Trainer, DataCollatorForTokenClassification
+from datasets import Dataset
 
-python
-Copy
-Edit
-python train.py
-To test the model on new Swahili text:
+model = AutoModelForTokenClassification.from_pretrained("lelapa/InkubaLM-0.4B", num_labels=NUM_LABELS)
+data_collator = DataCollatorForTokenClassification(tokenizer)
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset["train"],
+    eval_dataset=dataset["validation"],
+    data_collator=data_collator,
+)
+trainer.train()
+```
 
-python
-Copy
-Edit
-python infer.py --input "Julius Nyerere alizaliwa Tanzania."
-Results
-The model’s performance across training epochs:
+## Evaluation
+We evaluate the model using the **seqeval** metric:
+```python
+from seqeval.metrics import classification_report
+predictions = trainer.predict(dataset["test"])
+y_pred = predictions.predictions.argmax(-1)
+y_true = dataset["test"]["labels"]
+print(classification_report(y_true, y_pred))
+```
 
-Epoch	F1 Score
-1	0.715
-2	0.762
-3	0.793
-Future Work
-Fine-tuning on larger, more diverse datasets
-Exploring advanced models like GPT-3 and T5 for improved accuracy
-Real-world deployment for live NER applications
+## Usage
+After training, you can use the model to predict named entities in Swahili text.
+```python
+text = "Rais wa Kenya William Ruto alihutubia taifa."
+tokens = tokenizer(text, return_tensors="pt")
+predictions = model(**tokens)
+print(predictions)
+```
+
+## Future Work
+- Experiment with different pre-trained models.
+- Improve entity recognition by using additional Swahili corpora.
+- Deploy the model as an API for real-time NER tasks.
+
+## Author
+Vikalp Srivastava
+
+## License
+This project is for research purposes only.
+
